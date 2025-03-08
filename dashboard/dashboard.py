@@ -16,57 +16,72 @@ import seaborn as sns
 
 sns.set(style='darkgrid')
 st.title("Dashboard Penyewaan Sepeda")
-hour_file = st.sidebar.file_uploader("Upload file CSV Bike Sharing", type=['csv'])
-if hour_file is not None:
-  hour_data = pd.read_csv(hour_file)
-  if 'dteday' not in hour_data.columns:
+
+# Membaca file CSV dari folder "dashboard"
+hour_data = pd.read_csv("dashboard/hour.csv")
+
+# Pastikan kolom 'dteday' ada dan dikonversi ke datetime
+if 'dteday' not in hour_data.columns:
     hour_data.reset_index(inplace=True)
-  hour_data['dteday'] = pd.to_datetime(hour_data['dteday'])
-  hour_data.set_index('dteday', inplace=True)
+hour_data['dteday'] = pd.to_datetime(hour_data['dteday'])
+hour_data.set_index('dteday', inplace=True)
 
-  data_monthly = hour_data.copy()
-  monthly_data = data_monthly.resample('M').agg({'cnt':'sum'}).reset_index()
-  st.subheader("Jumlah Penyewaan Sepeda Bulanan")
-  fig1, ax1 = plt.subplots(figsize=(10,6))
-  ax1.plot(monthly_data['dteday'], monthly_data['cnt'], marker='o', linestyle='-')
-  ax1.set_title("Jumlah Penyewaan Sepeda Bulanan")
-  ax1.set_xlabel('Tanggal')
-  ax1.grid(True)
-  ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-  ax1.xaxis.set_major_locator(mdates.MonthLocator())
-  plt.xticks(rotation=45)
-  plt.tight_layout()
-  st.pyplot(fig1)
+# -----------------------------------------------------------
+# Plot 1: Jumlah Penyewaan Sepeda Bulanan
+# -----------------------------------------------------------
+data_monthly = hour_data.copy()
+monthly_data = data_monthly.resample('M').agg({'cnt': 'sum'}).reset_index()
 
-  st.subheader("Jumlah Sewa per Season")
-  season_sum = hour_data.groupby('season')['cnt'].nunique().reset_index()
-  season_labels = {1: 'Semi', 2: 'Panas', 3: 'Gugur', 4: 'Dingin'}
-  season_sum['season_label'] = season_sum['season'].map(season_labels)
-  fig2, ax2 = plt.subplots(figsize=(8, 6))
-  ax2.bar(season_sum['season_label'], season_sum['cnt'], color='skyblue')
-  ax2.set_title("Jumlah Sewa (cnt) per Season")
-  ax2.set_xlabel("Season")
-  ax2.set_ylabel("Jumlah cnt")
-  st.pyplot(fig2)
+st.subheader("Jumlah Penyewaan Sepeda Bulanan")
+fig1, ax1 = plt.subplots(figsize=(10, 6))
+ax1.plot(monthly_data['dteday'], monthly_data['cnt'], marker='o', linestyle='-')
+ax1.set_title("Jumlah Penyewaan Sepeda Bulanan")
+ax1.set_xlabel('Tanggal')
+ax1.grid(True)
+ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+ax1.xaxis.set_major_locator(mdates.MonthLocator())
+plt.xticks(rotation=45)
+plt.tight_layout()
+st.pyplot(fig1)
 
-  st.subheader("Jumlah Sewa per Kondisi Cuaca (Weathersit)")
-  weathersit_sum = hour_data.groupby('weathersit')['cnt'].nunique().reset_index()
-  weathersit_labels = {1: 'Cerah', 2: 'Kabut', 3: 'Hujan ringan', 4: 'Hujan lebat'}
-  weathersit_sum['weather_label'] = weathersit_sum['weathersit'].map(weathersit_labels)
-  fig3, ax3 = plt.subplots(figsize=(8, 6))
-  ax3.bar(weathersit_sum['weather_label'], weathersit_sum['cnt'], color='skyblue')
-  ax3.set_title("Jumlah Sewa (cnt) per Weathersit")
-  ax3.set_xlabel("Kondisi Cuaca")
-  ax3.set_ylabel("Jumlah cnt")
-  st.pyplot(fig3)
+# -----------------------------------------------------------
+# Plot 2: Jumlah Sewa per Season
+# -----------------------------------------------------------
+st.subheader("Jumlah Sewa per Season")
+season_sum = hour_data.groupby('season')['cnt'].nunique().reset_index()
+season_labels = {1: 'Semi', 2: 'Panas', 3: 'Gugur', 4: 'Dingin'}
+season_sum['season_label'] = season_sum['season'].map(season_labels)
+fig2, ax2 = plt.subplots(figsize=(8, 6))
+ax2.bar(season_sum['season_label'], season_sum['cnt'], color='skyblue')
+ax2.set_title("Jumlah Sewa (cnt) per Season")
+ax2.set_xlabel("Season")
+ax2.set_ylabel("Jumlah cnt")
+st.pyplot(fig2)
 
-  st.subheader("Pengaruh Fitur terhadap Casual dan Registered")
-  features = ['season', 'weathersit', 'holiday', 'workingday', 'weekday']
-  n_features = len(features)
-  fig4, axs = plt.subplots(n_features, 1, figsize=(10, 5 * n_features))
-  if n_features == 1:
+# -----------------------------------------------------------
+# Plot 3: Jumlah Sewa per Kondisi Cuaca (Weathersit)
+# -----------------------------------------------------------
+st.subheader("Jumlah Sewa per Kondisi Cuaca (Weathersit)")
+weathersit_sum = hour_data.groupby('weathersit')['cnt'].nunique().reset_index()
+weathersit_labels = {1: 'Cerah', 2: 'Kabut', 3: 'Hujan ringan', 4: 'Hujan lebat'}
+weathersit_sum['weather_label'] = weathersit_sum['weathersit'].map(weathersit_labels)
+fig3, ax3 = plt.subplots(figsize=(8, 6))
+ax3.bar(weathersit_sum['weather_label'], weathersit_sum['cnt'], color='skyblue')
+ax3.set_title("Jumlah Sewa (cnt) per Weathersit")
+ax3.set_xlabel("Kondisi Cuaca")
+ax3.set_ylabel("Jumlah cnt")
+st.pyplot(fig3)
+
+# -----------------------------------------------------------
+# Plot 4: Pengaruh Fitur terhadap Casual dan Registered
+# -----------------------------------------------------------
+st.subheader("Pengaruh Fitur terhadap Casual dan Registered")
+features = ['season', 'weathersit', 'holiday', 'workingday', 'weekday']
+n_features = len(features)
+fig4, axs = plt.subplots(n_features, 1, figsize=(10, 5 * n_features))
+if n_features == 1:
     axs = [axs]
-  for i, feature in enumerate(features):
+for i, feature in enumerate(features):
     aggregated = hour_data.groupby(feature)[['casual', 'registered']].sum().reset_index()
     ind = np.arange(len(aggregated))
     width = 0.35
@@ -78,26 +93,16 @@ if hour_file is not None:
     axs[i].set_xlabel(feature)
     axs[i].set_ylabel("Jumlah (Sum)")
     axs[i].legend()
-  plt.tight_layout()
-  st.pyplot(fig4)
+plt.tight_layout()
+st.pyplot(fig4)
 
-  st.subheader("Correlation Heatmap")
-  numeric_data = hour_data.select_dtypes(include=['float64', 'int64'])
-  corr_matrix = numeric_data.corr()
-  fig5, ax5 = plt.subplots(figsize=(12, 10))
-  sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", ax=ax5)
-  ax5.set_title("Correlation Heatmap dari Data Bike Sharing")
-  st.pyplot(fig5)
-
-  st.subheader("Jumlah Penyewaan Sepeda Harian")
-  df_daily = hour_data.copy().reset_index()
-  df_daily['dteday_str'] = df_daily['dteday'].dt.strftime('%Y-%m-%d')
-  fig6, ax6 = plt.subplots(figsize=(12, 6))
-  ax6.plot(df_daily['dteday_str'], df_daily['cnt'], '-o')
-  ax6.set_title("Jumlah Penyewaan Sepeda Harian")
-  ax6.set_xlabel("Tanggal")
-  ax6.tick_params(axis='x', rotation=45)
-  st.pyplot(fig6)
-
-else:
-  st.info("Silahkan upload file CSV")
+# -----------------------------------------------------------
+# Plot 5: Correlation Heatmap
+# -----------------------------------------------------------
+st.subheader("Correlation Heatmap")
+numeric_data = hour_data.select_dtypes(include=['float64', 'int64'])
+corr_matrix = numeric_data.corr()
+fig5, ax5 = plt.subplots(figsize=(12, 10))
+sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", ax=ax5)
+ax5.set_title("Correlation Heatmap dari Data Bike Sharing")
+st.pyplot(fig5)
