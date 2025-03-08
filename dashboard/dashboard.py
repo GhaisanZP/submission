@@ -17,92 +17,143 @@ import seaborn as sns
 sns.set(style='darkgrid')
 st.title("Dashboard Penyewaan Sepeda")
 
-# Membaca file CSV dari folder "dashboard"
-hour_data = pd.read_csv("dashboard/hour.csv")
+# Baca file CSV langsung dari folder "dashboard"
+@st.cache_data
+def load_data():
+    df = pd.read_csv("dashboard/hour.csv")
+    if 'dteday' not in df.columns:
+        df.reset_index(inplace=True)
+    df['dteday'] = pd.to_datetime(df['dteday'])
+    df.set_index('dteday', inplace=True)
+    return df
 
-# Pastikan kolom 'dteday' ada dan dikonversi ke datetime
-if 'dteday' not in hour_data.columns:
-    hour_data.reset_index(inplace=True)
-hour_data['dteday'] = pd.to_datetime(hour_data['dteday'])
-hour_data.set_index('dteday', inplace=True)
+hour_data = load_data()
 
-# -----------------------------------------------------------
-# Plot 1: Jumlah Penyewaan Sepeda Bulanan
-# -----------------------------------------------------------
-data_monthly = hour_data.copy()
-monthly_data = data_monthly.resample('M').agg({'cnt': 'sum'}).reset_index()
+# Sidebar: Filter Data
+st.sidebar.header("Filter Data")
 
-st.subheader("Jumlah Penyewaan Sepeda Bulanan")
-fig1, ax1 = plt.subplots(figsize=(10, 6))
-ax1.plot(monthly_data['dteday'], monthly_data['cnt'], marker='o', linestyle='-')
-ax1.set_title("Jumlah Penyewaan Sepeda Bulanan")
-ax1.set_xlabel('Tanggal')
-ax1.grid(True)
-ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-ax1.xaxis.set_major_locator(mdates.MonthLocator())
-plt.xticks(rotation=45)
-plt.tight_layout()
-st.pyplot(fig1)
+# Rentang Tanggal
+min_date = hour_data.index.min().date()
+max_date = hour_data.index.max().date()
+date_range = st.sidebar.date_input("Rentang Tanggal", value=[min_date, max_date], min_value=min_date, max_value=max_date)
+if len(date_range) == 2:
+    start_date, end_date = date_range
+    filtered_data = hour_data[(hour_data.index.date >= start_date) & (hour_data.index.date <= end_date)]
+else:
+    filtered_data = hour_data.copy()
 
-# -----------------------------------------------------------
-# Plot 2: Jumlah Sewa per Season
-# -----------------------------------------------------------
-st.subheader("Jumlah Sewa per Season")
-season_sum = hour_data.groupby('season')['cnt'].nunique().reset_index()
-season_labels = {1: 'Semi', 2: 'Panas', 3: 'Gugur', 4: 'Dingin'}
-season_sum['season_label'] = season_sum['season'].map(season_labels)
-fig2, ax2 = plt.subplots(figsize=(8, 6))
-ax2.bar(season_sum['season_label'], season_sum['cnt'], color='skyblue')
-ax2.set_title("Jumlah Sewa (cnt) per Season")
-ax2.set_xlabel("Season")
-ax2.set_ylabel("Jumlah cnt")
-st.pyplot(fig2)
+# Filter Berdasarkan Tahun
+# Di dataset, 'yr': 0 -> 2011, 1 -> 2012
+selected_years = st.sidebar.multiselect("Pilih Tahun", options=[2011, 2012], default=[2011, 2012])
+year_codes = [0 if year == 2011 else 1 for year in selected_years]
+filtered_data = filtered_data[filtered_data['yr'].isin(year_codes)]
 
-# -----------------------------------------------------------
-# Plot 3: Jumlah Sewa per Kondisi Cuaca (Weathersit)
-# -----------------------------------------------------------
-st.subheader("Jumlah Sewa per Kondisi Cuaca (Weathersit)")
-weathersit_sum = hour_data.groupby('weathersit')['cnt'].nunique().reset_index()
-weathersit_labels = {1: 'Cerah', 2: 'Kabut', 3: 'Hujan ringan', 4: 'Hujan lebat'}
-weathersit_sum['weather_label'] = weathersit_sum['weathersit'].map(weathersit_labels)
-fig3, ax3 = plt.subplots(figsize=(8, 6))
-ax3.bar(weathersit_sum['weather_label'], weathersit_sum['cnt'], color='skyblue')
-ax3.set_title("Jumlah Sewa (cnt) per Weathersit")
-ax3.set_xlabel("Kondisi Cuaca")
-ax3.set_ylabel("Jumlah cnt")
-st.pyplot(fig3)
+# Filter Berdasarkan Season
+season_options = {"Semi": 1, "Panas": 2, "Gugur": 3, "Dingin": 4}
+selected_seasons = st.sidebar.multiselect("Pilih Season", options=list(season_options.keys()), default=list(season_options.keys()))
+selected_season_codes = [season_options[s] for s in selected_seasons]
+filtered_data = filtered_data[filtered_data['season'].isin(selected_season_codes)]
 
-# -----------------------------------------------------------
-# Plot 4: Pengaruh Fitur terhadap Casual dan Registered
-# -----------------------------------------------------------
-st.subheader("Pengaruh Fitur terhadap Casual dan Registered")
-features = ['season', 'weathersit', 'holiday', 'workingday', 'weekday']
-n_features = len(features)
-fig4, axs = plt.subplots(n_features, 1, figsize=(10, 5 * n_features))
-if n_features == 1:
-    axs = [axs]
-for i, feature in enumerate(features):
-    aggregated = hour_data.groupby(feature)[['casual', 'registered']].sum().reset_index()
-    ind = np.arange(len(aggregated))
-    width = 0.35
-    axs[i].bar(ind - width/2, aggregated['casual'], width, label='Casual', alpha=0.7)
-    axs[i].bar(ind + width/2, aggregated['registered'], width, label='Registered', alpha=0.7)
-    axs[i].set_xticks(ind)
-    axs[i].set_xticklabels(aggregated[feature].astype(str))
-    axs[i].set_title(f"Pengaruh {feature} terhadap Casual dan Registered")
-    axs[i].set_xlabel(feature)
-    axs[i].set_ylabel("Jumlah (Sum)")
-    axs[i].legend()
-plt.tight_layout()
-st.pyplot(fig4)
+# Filter Berdasarkan Bulan
+unique_months = sorted(filtered_data['mnth'].unique())
+selected_months = st.sidebar.multiselect("Pilih Bulan", options=unique_months, default=unique_months)
+filtered_data = filtered_data[filtered_data['mnth'].isin(selected_months)]
 
-# -----------------------------------------------------------
-# Plot 5: Correlation Heatmap
-# -----------------------------------------------------------
-st.subheader("Correlation Heatmap")
-numeric_data = hour_data.select_dtypes(include=['float64', 'int64'])
-corr_matrix = numeric_data.corr()
-fig5, ax5 = plt.subplots(figsize=(12, 10))
-sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", ax=ax5)
-ax5.set_title("Correlation Heatmap dari Data Bike Sharing")
-st.pyplot(fig5)
+# Sidebar: Pilih Grafik yang ingin ditampilkan
+st.sidebar.header("Pilih Grafik")
+graph_options = st.sidebar.multiselect(
+    "Pilih grafik untuk ditampilkan", 
+    options=[
+        "Jumlah Penyewaan Bulanan",
+        "Jumlah Sewa per Season",
+        "Jumlah Sewa per Kondisi Cuaca",
+        "Pengaruh Fitur terhadap Casual dan Registered",
+        "Correlation Heatmap"
+    ],
+    default=[
+        "Jumlah Penyewaan Bulanan",
+        "Jumlah Sewa per Season",
+        "Jumlah Sewa per Kondisi Cuaca",
+        "Pengaruh Fitur terhadap Casual dan Registered",
+        "Correlation Heatmap"
+    ]
+)
+
+# Tampilkan pesan jika data kosong setelah filter
+if filtered_data.empty:
+    st.warning("Data tidak ditemukan untuk filter yang dipilih. Silakan ubah filter di sidebar.")
+else:
+    # Grafik 1: Jumlah Penyewaan Bulanan
+    if "Jumlah Penyewaan Bulanan" in graph_options:
+        st.subheader("Jumlah Penyewaan Sepeda Bulanan")
+        data_monthly = filtered_data.copy()
+        monthly_data = data_monthly.resample('M').agg({'cnt': 'sum'}).reset_index()
+        fig1, ax1 = plt.subplots(figsize=(10, 6))
+        ax1.plot(monthly_data['dteday'], monthly_data['cnt'], marker='o', linestyle='-')
+        ax1.set_title("Jumlah Penyewaan Sepeda Bulanan")
+        ax1.set_xlabel("Tanggal")
+        ax1.grid(True)
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax1.xaxis.set_major_locator(mdates.MonthLocator())
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.pyplot(fig1)
+
+    # Grafik 2: Jumlah Sewa per Season
+    if "Jumlah Sewa per Season" in graph_options:
+        st.subheader("Jumlah Sewa per Season")
+        season_sum = filtered_data.groupby('season')['cnt'].nunique().reset_index()
+        season_labels = {1: 'Semi', 2: 'Panas', 3: 'Gugur', 4: 'Dingin'}
+        season_sum['season_label'] = season_sum['season'].map(season_labels)
+        fig2, ax2 = plt.subplots(figsize=(8, 6))
+        ax2.bar(season_sum['season_label'], season_sum['cnt'], color='skyblue')
+        ax2.set_title("Jumlah Sewa (cnt) per Season")
+        ax2.set_xlabel("Season")
+        ax2.set_ylabel("Jumlah cnt")
+        st.pyplot(fig2)
+
+    # Grafik 3: Jumlah Sewa per Kondisi Cuaca (Weathersit)
+    if "Jumlah Sewa per Kondisi Cuaca" in graph_options:
+        st.subheader("Jumlah Sewa per Kondisi Cuaca (Weathersit)")
+        weathersit_sum = filtered_data.groupby('weathersit')['cnt'].nunique().reset_index()
+        weathersit_labels = {1: 'Cerah', 2: 'Kabut', 3: 'Hujan ringan', 4: 'Hujan lebat'}
+        weathersit_sum['weather_label'] = weathersit_sum['weathersit'].map(weathersit_labels)
+        fig3, ax3 = plt.subplots(figsize=(8, 6))
+        ax3.bar(weathersit_sum['weather_label'], weathersit_sum['cnt'], color='skyblue')
+        ax3.set_title("Jumlah Sewa (cnt) per Weathersit")
+        ax3.set_xlabel("Kondisi Cuaca")
+        ax3.set_ylabel("Jumlah cnt")
+        st.pyplot(fig3)
+
+    # Grafik 4: Pengaruh Fitur terhadap Casual dan Registered
+    if "Pengaruh Fitur terhadap Casual dan Registered" in graph_options:
+        st.subheader("Pengaruh Fitur terhadap Casual dan Registered")
+        features = ['season', 'weathersit', 'holiday', 'workingday', 'weekday']
+        n_features = len(features)
+        fig4, axs = plt.subplots(n_features, 1, figsize=(10, 5 * n_features))
+        if n_features == 1:
+            axs = [axs]
+        for i, feature in enumerate(features):
+            aggregated = filtered_data.groupby(feature)[['casual', 'registered']].sum().reset_index()
+            ind = np.arange(len(aggregated))
+            width = 0.35
+            axs[i].bar(ind - width/2, aggregated['casual'], width, label='Casual', alpha=0.7)
+            axs[i].bar(ind + width/2, aggregated['registered'], width, label='Registered', alpha=0.7)
+            axs[i].set_xticks(ind)
+            axs[i].set_xticklabels(aggregated[feature].astype(str))
+            axs[i].set_title(f"Pengaruh {feature} terhadap Casual dan Registered")
+            axs[i].set_xlabel(feature)
+            axs[i].set_ylabel("Jumlah (Sum)")
+            axs[i].legend()
+        plt.tight_layout()
+        st.pyplot(fig4)
+
+    # Grafik 5: Correlation Heatmap
+    if "Correlation Heatmap" in graph_options:
+        st.subheader("Correlation Heatmap")
+        numeric_data = filtered_data.select_dtypes(include=['float64', 'int64'])
+        corr_matrix = numeric_data.corr()
+        fig5, ax5 = plt.subplots(figsize=(12, 10))
+        sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", ax=ax5)
+        ax5.set_title("Correlation Heatmap dari Data Bike Sharing")
+        st.pyplot(fig5)
